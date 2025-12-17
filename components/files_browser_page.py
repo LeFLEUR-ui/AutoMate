@@ -4,7 +4,7 @@ import shutil
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QLineEdit, QFrame, QTreeView, 
                              QFileSystemModel, QHeaderView, QFileDialog, QInputDialog, QMessageBox)
-from PyQt5.QtCore import Qt, QDir
+from PyQt5.QtCore import Qt, QDir, QSortFilterProxyModel, QRegExp
 from PyQt5.QtGui import QFont
 
 class FileBrowserUI(QWidget):
@@ -21,19 +21,19 @@ class FileBrowserUI(QWidget):
         self.title = QLabel("File Browser")
         self.title.setStyleSheet("font-size: 20px; font-weight: 600; color: #0F172A;")
         
-        self.subtitle = QLabel("Browse and manage your files and folders")
+        self.subtitle = QLabel("Browse drives, files, and folders")
         self.subtitle.setStyleSheet("font-size: 14px; color: #64748B; margin-bottom: 25px;")
         
         self.main_layout.addWidget(self.title)
         self.main_layout.addWidget(self.subtitle)
-        
+
         toolbar_container = QFrame()
         toolbar_layout = QHBoxLayout(toolbar_container)
         toolbar_layout.setContentsMargins(0, 0, 0, 15)
         toolbar_layout.setSpacing(10)
         
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search files and folders...")
+        self.search_input.setPlaceholderText("Search drives, files, and folders...")
         self.search_input.setFixedHeight(40)
         self.search_input.setStyleSheet("""
             QLineEdit {
@@ -81,12 +81,18 @@ class FileBrowserUI(QWidget):
         self.main_layout.addWidget(toolbar_container)
 
         self.model = QFileSystemModel()
-        self.current_root = QDir.homePath() 
-        self.model.setRootPath(self.current_root)
-        
+        self.model.setRootPath("") 
+
+        self.proxy_model = QSortFilterProxyModel()
+        self.proxy_model.setSourceModel(self.model)
+        self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self.proxy_model.setRecursiveFilteringEnabled(True)
+
         self.tree = QTreeView()
-        self.tree.setModel(self.model)
-        self.tree.setRootIndex(self.model.index(self.current_root))
+        self.tree.setModel(self.proxy_model)
+
+        self.tree.setRootIndex(self.proxy_model.mapFromSource(self.model.index("")))
+        
         self.tree.setIndentation(25)
         self.tree.setAnimated(True)
         self.tree.setFrameShape(QFrame.NoFrame)
@@ -109,49 +115,18 @@ class FileBrowserUI(QWidget):
                 background-color: #F1F5F9; 
                 color: #2563EB; 
             }
-
-            /* Modern Vertical Scrollbar */
             QScrollBar:vertical {
-                border: none;
-                background: transparent;
-                width: 8px;
-                margin: 0px;
+                border: none; background: transparent; width: 8px; margin: 0px;
             }
             QScrollBar::handle:vertical {
-                background: #CBD5E1;
-                min-height: 40px;
-                border-radius: 4px;
+                background: #CBD5E1; min-height: 40px; border-radius: 4px;
             }
-            QScrollBar::handle:vertical:hover {
-                background: #94A3B8;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-
-            /* Modern Horizontal Scrollbar */
+            QScrollBar::handle:vertical:hover { background: #94A3B8; }
             QScrollBar:horizontal {
-                border: none;
-                background: transparent;
-                height: 8px;
-                margin: 0px;
+                border: none; background: transparent; height: 8px; margin: 0px;
             }
             QScrollBar::handle:horizontal {
-                background: #CBD5E1;
-                min-width: 40px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:horizontal:hover {
-                background: #94A3B8;
-            }
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                width: 0px;
-            }
-            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
-                background: none;
+                background: #CBD5E1; min-width: 40px; border-radius: 4px;
             }
         """)
 
@@ -161,7 +136,7 @@ class FileBrowserUI(QWidget):
         footer_frame.setFixedHeight(60)
         footer_layout = QHBoxLayout(footer_frame)
         
-        self.stats_label = QLabel("Select a file to see details")
+        self.stats_label = QLabel("Select a drive or file to see details")
         self.stats_label.setStyleSheet("color: #64748B; font-size: 13px;")
         
         self.size_label = QLabel("")
@@ -177,12 +152,19 @@ class FileBrowserUI(QWidget):
         self.tree.selectionModel().selectionChanged.connect(self.update_footer_info)
         self.upload_btn.clicked.connect(self.handle_upload)
         self.new_folder_btn.clicked.connect(self.handle_new_folder)
+        self.search_input.textChanged.connect(self.handle_search)
+
+    def handle_search(self, text):
+        reg_exp = QRegExp(text, Qt.CaseInsensitive, QRegExp.Wildcard)
+        self.proxy_model.setFilterRegExp(reg_exp)
 
     def handle_upload(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Upload")
         if file_path:
             index = self.tree.currentIndex()
-            dest_dir = self.model.filePath(index) if os.path.isdir(self.model.filePath(index)) else self.current_root
+            source_index = self.proxy_model.mapToSource(index)
+
+            dest_dir = self.model.filePath(source_index) if os.path.isdir(self.model.filePath(source_index)) else QDir.homePath()
             try:
                 shutil.copy(file_path, dest_dir)
             except Exception as e:
@@ -192,7 +174,8 @@ class FileBrowserUI(QWidget):
         folder_name, ok = QInputDialog.getText(self, 'New Folder', 'Enter folder name:')
         if ok and folder_name:
             index = self.tree.currentIndex()
-            parent_path = self.model.filePath(index) if os.path.isdir(self.model.filePath(index)) else self.current_root
+            source_index = self.proxy_model.mapToSource(index)
+            parent_path = self.model.filePath(source_index) if os.path.isdir(self.model.filePath(source_index)) else QDir.homePath()
             new_path = os.path.join(parent_path, folder_name)
             if not os.path.exists(new_path):
                 os.makedirs(new_path)
@@ -210,18 +193,25 @@ class FileBrowserUI(QWidget):
         index = self.tree.currentIndex()
         if not index.isValid():
             return
-        file_path = self.model.filePath(index)
-        file_name = self.model.fileName(index)
+        
+        source_index = self.proxy_model.mapToSource(index)
+        file_path = self.model.filePath(source_index)
+        file_name = self.model.fileName(source_index)
+        
+        if not file_name: # Handle Drive root cases
+            file_name = file_path
+
         if os.path.isdir(file_path):
-            self.stats_label.setText(f"Folder: {file_name}")
+            self.stats_label.setText(f"Folder/Drive: {file_name}")
             self.size_label.setText("--")
         else:
-            file_size = self.model.size(index)
+            file_size = self.model.size(source_index)
             self.stats_label.setText(f"File: {file_name}")
             self.size_label.setText(f"Size: {self.format_size(file_size)}")
 
     def open_file(self, index):
-        path = self.model.filePath(index)
+        source_index = self.proxy_model.mapToSource(index)
+        path = self.model.filePath(source_index)
         try:
             if sys.platform == 'win32':
                 os.startfile(path)
