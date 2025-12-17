@@ -1,10 +1,11 @@
 import sys
 import os
+import shutil
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QLineEdit, QFrame, QTreeView, 
-                             QFileSystemModel, QHeaderView)
-from PyQt5.QtCore import Qt, QDir, QSize
-from PyQt5.QtGui import QIcon
+                             QFileSystemModel, QHeaderView, QFileDialog, QInputDialog, QMessageBox)
+from PyQt5.QtCore import Qt, QDir
+from PyQt5.QtGui import QFont
 
 class FileBrowserUI(QWidget):
     def __init__(self):
@@ -12,13 +13,11 @@ class FileBrowserUI(QWidget):
         self.setWindowTitle("File Browser")
         self.resize(1100, 700)
         self.setStyleSheet("background-color: white; font-family: 'Segoe UI', sans-serif;")
-        
-        # Main Layout
+
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(40, 40, 40, 20)
         self.main_layout.setSpacing(0)
 
-        # --- HEADER SECTION ---
         self.title = QLabel("File Browser")
         self.title.setStyleSheet("font-size: 20px; font-weight: 600; color: #0F172A;")
         
@@ -27,8 +26,7 @@ class FileBrowserUI(QWidget):
         
         self.main_layout.addWidget(self.title)
         self.main_layout.addWidget(self.subtitle)
-
-        # --- TOOLBAR SECTION ---
+        
         toolbar_container = QFrame()
         toolbar_layout = QHBoxLayout(toolbar_container)
         toolbar_layout.setContentsMargins(0, 0, 0, 15)
@@ -37,48 +35,128 @@ class FileBrowserUI(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search files and folders...")
         self.search_input.setFixedHeight(40)
-        self.search_input.setStyleSheet("border: 1px solid #E2E8F0; border-radius: 6px; padding-left: 15px;")
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #E2E8F0; 
+                border-radius: 6px; 
+                padding-left: 15px;
+                background-color: #F8FAFC;
+            }
+            QLineEdit:focus {
+                border: 1px solid #2563EB;
+            }
+        """)
         
-        self.upload_btn = QPushButton("  Upload")
+        self.upload_btn = QPushButton("Upload")
         self.upload_btn.setFixedHeight(40)
         self.upload_btn.setFixedWidth(110)
-        self.upload_btn.setStyleSheet("background-color: #2563EB; color: white; border-radius: 6px; font-weight: 500;")
+        self.upload_btn.setCursor(Qt.PointingHandCursor)
+        self.upload_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2563EB; 
+                color: white; 
+                border-radius: 6px; 
+                font-weight: 500;
+            }
+            QPushButton:hover { background-color: #1D4ED8; }
+        """)
 
-        self.new_folder_btn = QPushButton("  New Folder")
+        self.new_folder_btn = QPushButton("New Folder")
         self.new_folder_btn.setFixedHeight(40)
         self.new_folder_btn.setFixedWidth(120)
-        self.new_folder_btn.setStyleSheet("background-color: white; border: 1px solid #E2E8F0; border-radius: 6px;")
+        self.new_folder_btn.setCursor(Qt.PointingHandCursor)
+        self.new_folder_btn.setStyleSheet("""
+            QPushButton {
+                background-color: white; 
+                border: 1px solid #E2E8F0; 
+                border-radius: 6px;
+                color: #475569;
+            }
+            QPushButton:hover { background-color: #F8FAFC; }
+        """)
 
         toolbar_layout.addWidget(self.search_input)
         toolbar_layout.addWidget(self.upload_btn)
         toolbar_layout.addWidget(self.new_folder_btn)
         self.main_layout.addWidget(toolbar_container)
 
-        # --- FILE SYSTEM VIEW ---
         self.model = QFileSystemModel()
-        root_path = QDir.homePath() 
-        self.model.setRootPath(root_path)
+        self.current_root = QDir.homePath() 
+        self.model.setRootPath(self.current_root)
         
         self.tree = QTreeView()
         self.tree.setModel(self.model)
-        self.tree.setRootIndex(self.model.index(root_path))
+        self.tree.setRootIndex(self.model.index(self.current_root))
         self.tree.setIndentation(25)
         self.tree.setAnimated(True)
         self.tree.setFrameShape(QFrame.NoFrame)
-        
-        # Hide headers to match the clean UI look
         self.tree.header().hide()
         self.tree.header().setSectionResizeMode(0, QHeaderView.Stretch)
 
         self.tree.setStyleSheet("""
-            QTreeView { border: 1px solid #F1F5F9; border-radius: 8px; color: #475569; outline: none; }
-            QTreeView::item { padding: 10px; height: 45px; border-bottom: 1px solid #F8FAFC; }
-            QTreeView::item:selected { background-color: #F1F5F9; color: #2563EB; }
+            QTreeView { 
+                border: 1px solid #F1F5F9; 
+                border-radius: 8px; 
+                color: #475569; 
+                outline: none; 
+            }
+            QTreeView::item { 
+                padding: 10px; 
+                height: 45px; 
+                border-bottom: 1px solid #F8FAFC; 
+            }
+            QTreeView::item:selected { 
+                background-color: #F1F5F9; 
+                color: #2563EB; 
+            }
+
+            /* Modern Vertical Scrollbar */
+            QScrollBar:vertical {
+                border: none;
+                background: transparent;
+                width: 8px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #CBD5E1;
+                min-height: 40px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #94A3B8;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+
+            /* Modern Horizontal Scrollbar */
+            QScrollBar:horizontal {
+                border: none;
+                background: transparent;
+                height: 8px;
+                margin: 0px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #CBD5E1;
+                min-width: 40px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #94A3B8;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
+            }
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                background: none;
+            }
         """)
 
         self.main_layout.addWidget(self.tree)
 
-        # --- FOOTER SECTION ---
         footer_frame = QFrame()
         footer_frame.setFixedHeight(60)
         footer_layout = QHBoxLayout(footer_frame)
@@ -95,13 +173,33 @@ class FileBrowserUI(QWidget):
         
         self.main_layout.addWidget(footer_frame)
 
-        # --- CONNECTIONS ---
         self.tree.doubleClicked.connect(self.open_file)
-        # Connect selection change to our update function
         self.tree.selectionModel().selectionChanged.connect(self.update_footer_info)
+        self.upload_btn.clicked.connect(self.handle_upload)
+        self.new_folder_btn.clicked.connect(self.handle_new_folder)
+
+    def handle_upload(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Upload")
+        if file_path:
+            index = self.tree.currentIndex()
+            dest_dir = self.model.filePath(index) if os.path.isdir(self.model.filePath(index)) else self.current_root
+            try:
+                shutil.copy(file_path, dest_dir)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Could not upload file: {str(e)}")
+
+    def handle_new_folder(self):
+        folder_name, ok = QInputDialog.getText(self, 'New Folder', 'Enter folder name:')
+        if ok and folder_name:
+            index = self.tree.currentIndex()
+            parent_path = self.model.filePath(index) if os.path.isdir(self.model.filePath(index)) else self.current_root
+            new_path = os.path.join(parent_path, folder_name)
+            if not os.path.exists(new_path):
+                os.makedirs(new_path)
+            else:
+                QMessageBox.warning(self, "Warning", "Folder already exists.")
 
     def format_size(self, size):
-        """Converts bytes to a human-readable format."""
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
             if size < 1024:
                 return f"{size:.1f} {unit}"
@@ -109,17 +207,14 @@ class FileBrowserUI(QWidget):
         return f"{size:.1f} PB"
 
     def update_footer_info(self):
-        """Updates the footer with the selected file's name and size."""
         index = self.tree.currentIndex()
         if not index.isValid():
             return
-
         file_path = self.model.filePath(index)
         file_name = self.model.fileName(index)
-        
         if os.path.isdir(file_path):
             self.stats_label.setText(f"Folder: {file_name}")
-            self.size_label.setText("--") # Calculating folder size is slow; usually left blank
+            self.size_label.setText("--")
         else:
             file_size = self.model.size(index)
             self.stats_label.setText(f"File: {file_name}")
@@ -127,11 +222,21 @@ class FileBrowserUI(QWidget):
 
     def open_file(self, index):
         path = self.model.filePath(index)
-        if sys.platform == 'win32':
-            os.startfile(path)
-        elif sys.platform == 'darwin':
-            import subprocess
-            subprocess.call(['open', path])
-        else:
-            import subprocess
-            subprocess.call(['xdg-open', path])
+        try:
+            if sys.platform == 'win32':
+                os.startfile(path)
+            elif sys.platform == 'darwin':
+                import subprocess
+                subprocess.call(['open', path])
+            else:
+                import subprocess
+                subprocess.call(['xdg-open', path])
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Could not open file: {e}")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    app.setFont(QFont("Segoe UI", 10))
+    window = FileBrowserUI()
+    window.show()
+    sys.exit(app.exec_())
