@@ -1,10 +1,12 @@
 import sys
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-                             QFrame, QLabel, QPushButton, QDesktopWidget,
-                             QStackedWidget, QSizePolicy)
+                             QFrame, QLabel, QPushButton,
+                             QStackedWidget)
 from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QSize, QPoint
 from PyQt5.QtGui import QIcon, QPixmap, QFontDatabase, QFont
 
+from components.batch_rename_page import BatchRenameUI
+from components.cloud_sync_page import CloudSyncUI
 from components.dashboard_page import DashboardPage
 from components.files_browser_page import FileBrowserUI
 from components.organize_download_page import OrganizeDownloadPage
@@ -44,6 +46,9 @@ class AutoMateUI(QWidget):
         self.stack.addWidget(FileBrowserUI())
         self.stack.addWidget(RulesPage())
         self.stack.addWidget(OrganizeDownloadPage())
+        self.batch_rename_page = BatchRenameUI()
+        self.stack.addWidget(self.batch_rename_page)
+        self.stack.addWidget(CloudSyncUI())
         
         self.content_layout.addWidget(self.stack)
         self.main_layout.addWidget(self.content_container)
@@ -105,7 +110,9 @@ class AutoMateUI(QWidget):
             ("Dashboard", "assets/icons/home.png"),
             ("Files", "assets/icons/folder dashboard.png"),
             ("Rules", "assets/icons/settings.png"),
-            ("Organize", "assets/icons/download.png")
+            ("Organize", "assets/icons/download.png"),
+            ("Rename", "assets/icons/edit.png"),
+            ("Cloud", "assets/icons/cloud.png")
         ]
 
         for i, (text, icon_path) in enumerate(nav_items):
